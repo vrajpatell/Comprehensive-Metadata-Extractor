@@ -1,6 +1,9 @@
 # Comprehensive Metadata Extractor
 
-This project is a Python tool designed to extract detailed metadata from a variety of document types. In addition to retrieving document-specific properties, the tool also gathers file system metadata such as file size, permissions, and timestamps.
+This project is a Python CLI tool that extracts detailed metadata from common Office and PDF document formats. It combines:
+
+- **Document metadata** (author, title, revision, etc.)
+- **Filesystem metadata** (size, timestamps, permissions)
 
 ## Supported Document Types
 
@@ -18,7 +21,40 @@ This project is a Python tool designed to extract detailed metadata from a varie
 
 ## Installation
 
-Install the required dependencies using pip:
+Install dependencies:
 
 ```bash
 pip install python-docx python-pptx openpyxl olefile PyPDF2
+```
+
+## Usage
+
+Run the extractor against a supported file:
+
+```bash
+python metadata_extractor.py path/to/document.pdf
+```
+
+Successful output is JSON:
+
+```json
+{
+  "file_system": {
+    "file_name": "document.pdf",
+    "file_path": "/abs/path/document.pdf",
+    "size_bytes": 12345
+  },
+  "document_format": ".pdf",
+  "document_metadata": {
+    "Author": "Example",
+    "number_of_pages": 10
+  }
+}
+```
+
+## Error Handling Behavior
+
+- Missing files raise a clear file-not-found error.
+- Unsupported extensions raise a clear unsupported-format error.
+- Missing optional parsers raise actionable install guidance.
+- Non-JSON-native metadata values are normalized into JSON-safe output.
