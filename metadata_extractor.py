@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
-"""
-metadata_extractor.py
+"""Comprehensive metadata extraction for Office and PDF documents.
 
-A comprehensive metadata extraction tool for various document types.
-This tool extracts detailed metadata including both file system attributes and document-specific properties.
-Supported file types include:
-  - DOCX files using python-docx
-  - XLSX files using openpyxl
-  - PPTX files using python-pptx
-  - PDF files using PyPDF2
-  - Legacy OLE files (DOC, XLS, PPT) using olefile
-
-Usage:
-    python metadata_extractor.py path/to/document
+This module can be used both as:
+- a command line script (`python metadata_extractor.py <file>`)
+- an importable library (`from metadata_extractor import extract_metadata`)
 """
 
-import os
-import sys
 import argparse
 import json
+import os
 import stat
+import sys
 from datetime import datetime
+from typing import Dict
+
+SUPPORTED_EXTENSIONS = {".docx", ".xlsx", ".pptx", ".pdf", ".doc", ".xls", ".ppt"}
 
 
-def _dependency_import_error(package_name, install_name=None):
+def _dependency_import_error(package_name: str, install_name: str | None = None) -> None:
     """Raise a consistent error when an optional dependency is missing."""
     package_to_install = install_name or package_name
     raise RuntimeError(
@@ -32,7 +26,7 @@ def _dependency_import_error(package_name, install_name=None):
 
 
 def _make_json_safe(value):
-    """Convert nested metadata values into JSON-serializable Python primitives."""
+    """Convert nested metadata values into JSON-serializable primitives."""
     if isinstance(value, (str, int, float, bool)) or value is None:
         return value
     if isinstance(value, datetime):
@@ -45,37 +39,31 @@ def _make_json_safe(value):
         return [_make_json_safe(item) for item in value]
     return str(value)
 
-def get_filesystem_metadata(file_path):
-    """
-    Retrieves file system metadata such as file size, permissions, creation and modification times.
-    """
-    try:
-        st = os.stat(file_path)
-        metadata = {
-            "file_name": os.path.basename(file_path),
-            "file_path": os.path.abspath(file_path),
-            "size_bytes": st.st_size,
-            "permissions": stat.filemode(st.st_mode),
-            "last_modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
-            "last_access": datetime.fromtimestamp(st.st_atime).isoformat(),
-            "creation_time": datetime.fromtimestamp(st.st_ctime).isoformat(),
-        }
-        return metadata
-    except Exception as e:
-        return {"error": f"Error retrieving filesystem metadata: {str(e)}"}
 
-def extract_docx_metadata(file_path):
-    """
-    Extracts detailed metadata from a DOCX file using python-docx.
-    """
+def get_filesystem_metadata(file_path: str) -> Dict[str, str]:
+    """Retrieve filesystem metadata (size, timestamps, permissions)."""
+    st = os.stat(file_path)
+    return {
+        "file_name": os.path.basename(file_path),
+        "file_path": os.path.abspath(file_path),
+        "size_bytes": st.st_size,
+        "permissions": stat.filemode(st.st_mode),
+        "last_modified": datetime.fromtimestamp(st.st_mtime).isoformat(),
+        "last_access": datetime.fromtimestamp(st.st_atime).isoformat(),
+        "creation_time": datetime.fromtimestamp(st.st_ctime).isoformat(),
+    }
+
+
+def extract_docx_metadata(file_path: str) -> Dict:
+    """Extract metadata from DOCX files using python-docx."""
     try:
         from docx import Document
     except ImportError:
         _dependency_import_error("python-docx")
-    
+
     doc = Document(file_path)
     core_props = doc.core_properties
-    metadata = {
+    return {
         "author": core_props.author,
         "category": core_props.category,
         "comments": core_props.comments,
@@ -90,25 +78,22 @@ def extract_docx_metadata(file_path):
         "revision": core_props.revision,
         "subject": core_props.subject,
         "title": core_props.title,
-        # Additional detailed info can include custom properties if needed.
         "detailed": {
             "property_names": [prop for prop in dir(core_props) if not prop.startswith("_")],
-        }
+        },
     }
-    return metadata
 
-def extract_xlsx_metadata(file_path):
-    """
-    Extracts detailed metadata from an XLSX file using openpyxl.
-    """
+
+def extract_xlsx_metadata(file_path: str) -> Dict:
+    """Extract metadata from XLSX files using openpyxl."""
     try:
         from openpyxl import load_workbook
     except ImportError:
         _dependency_import_error("openpyxl")
-    
+
     wb = load_workbook(file_path, read_only=True)
     props = wb.properties
-    metadata = {
+    return {
         "title": props.title,
         "subject": props.subject,
         "creator": props.creator,
@@ -118,25 +103,22 @@ def extract_xlsx_metadata(file_path):
         "keywords": props.keywords,
         "category": props.category,
         "description": props.description,
-        # Additional properties can be extended here
         "detailed": {
-            "application": props.appVersion if hasattr(props, 'appVersion') else None,
-        }
+            "application": props.appVersion if hasattr(props, "appVersion") else None,
+        },
     }
-    return metadata
 
-def extract_pptx_metadata(file_path):
-    """
-    Extracts detailed metadata from a PPTX file using python-pptx.
-    """
+
+def extract_pptx_metadata(file_path: str) -> Dict:
+    """Extract metadata from PPTX files using python-pptx."""
     try:
         from pptx import Presentation
     except ImportError:
         _dependency_import_error("python-pptx")
-    
+
     prs = Presentation(file_path)
     core_props = prs.core_properties
-    metadata = {
+    return {
         "author": core_props.author,
         "category": core_props.category,
         "comments": core_props.comments,
@@ -153,50 +135,40 @@ def extract_pptx_metadata(file_path):
         "title": core_props.title,
         "detailed": {
             "property_names": [prop for prop in dir(core_props) if not prop.startswith("_")],
-        }
+        },
     }
-    return metadata
 
-def extract_pdf_metadata(file_path):
-    """
-    Extracts detailed metadata from a PDF file using PyPDF2.
-    """
+
+def extract_pdf_metadata(file_path: str) -> Dict:
+    """Extract metadata from PDF files using PyPDF2."""
     try:
         from PyPDF2 import PdfReader
     except ImportError:
         _dependency_import_error("PyPDF2")
-    
-    try:
-        reader = PdfReader(file_path)
-        raw_metadata = reader.metadata
-        metadata = {}
-        if raw_metadata:
-            for key, value in raw_metadata.items():
-                # Removing leading '/' from keys and converting datetime if needed
-                clean_key = key.lstrip("/")
-                if isinstance(value, datetime):
-                    metadata[clean_key] = value.isoformat()
-                else:
-                    metadata[clean_key] = value
-        # Additional details like number of pages and PDF version
-        metadata["number_of_pages"] = len(reader.pages)
-        metadata["pdf_version"] = reader.pdf_header if hasattr(reader, 'pdf_header') else None
-        return metadata
-    except Exception as e:
-        raise ValueError("Error reading PDF metadata: " + str(e))
 
-def extract_ole_metadata(file_path):
-    """
-    Extracts detailed metadata from legacy OLE Office files (DOC, XLS, PPT) using olefile.
-    """
+    reader = PdfReader(file_path)
+    raw_metadata = reader.metadata
+    metadata = {}
+    if raw_metadata:
+        for key, value in raw_metadata.items():
+            clean_key = key.lstrip("/")
+            metadata[clean_key] = value.isoformat() if isinstance(value, datetime) else value
+
+    metadata["number_of_pages"] = len(reader.pages)
+    metadata["pdf_version"] = reader.pdf_header if hasattr(reader, "pdf_header") else None
+    return metadata
+
+
+def extract_ole_metadata(file_path: str) -> Dict:
+    """Extract metadata from legacy OLE Office files (DOC, XLS, PPT)."""
     try:
         import olefile
     except ImportError:
         _dependency_import_error("olefile")
-    
+
     if not olefile.isOleFile(file_path):
         raise ValueError("Not a valid OLE file.")
-    
+
     ole = olefile.OleFileIO(file_path)
     meta = ole.get_metadata()
     metadata = {
@@ -212,24 +184,21 @@ def extract_ole_metadata(file_path):
         "last_printed": meta.last_printed.isoformat() if meta.last_printed else None,
         "last_saved_time": meta.last_save_time.isoformat() if meta.last_save_time else None,
         "detailed": {
-            "properties": [prop for prop in dir(meta) if not prop.startswith("_")]
-        }
+            "properties": [prop for prop in dir(meta) if not prop.startswith("_")],
+        },
     }
     ole.close()
     return metadata
 
-def extract_metadata(file_path):
-    """
-    Determines file type based on extension and extracts metadata accordingly.
-    Combines filesystem metadata and document-specific metadata into a detailed structure.
-    """
+
+def extract_metadata(file_path: str) -> Dict:
+    """Extract filesystem + document metadata for a supported file path."""
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"File does not exist: {file_path}")
 
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
 
-    doc_metadata = {}
     if ext == ".docx":
         doc_metadata = extract_docx_metadata(file_path)
     elif ext == ".xlsx":
@@ -238,33 +207,34 @@ def extract_metadata(file_path):
         doc_metadata = extract_pptx_metadata(file_path)
     elif ext == ".pdf":
         doc_metadata = extract_pdf_metadata(file_path)
-    elif ext in [".doc", ".xls", ".ppt"]:
+    elif ext in {".doc", ".xls", ".ppt"}:
         doc_metadata = extract_ole_metadata(file_path)
     else:
-        raise ValueError("Unsupported file format: " + ext)
+        raise ValueError(f"Unsupported file format: {ext}")
 
-    filesystem_metadata = get_filesystem_metadata(file_path)
     combined_metadata = {
-        "file_system": filesystem_metadata,
+        "file_system": get_filesystem_metadata(file_path),
         "document_format": ext,
         "document_metadata": doc_metadata,
     }
     return _make_json_safe(combined_metadata)
 
-def main():
-    parser = argparse.ArgumentParser(description="Extract comprehensive metadata from Office and PDF documents.")
+
+def main() -> None:
+    """CLI entry point."""
+    parser = argparse.ArgumentParser(
+        description="Extract comprehensive metadata from Office and PDF documents."
+    )
     parser.add_argument("file", type=str, help="Path to the document")
     args = parser.parse_args()
 
-    file_path = args.file
-
     try:
-        metadata = extract_metadata(file_path)
-        # Print the structured metadata as a JSON string
+        metadata = extract_metadata(args.file)
         print(json.dumps(metadata, indent=4))
-    except Exception as e:
-        print("Error extracting metadata:", str(e))
+    except Exception as exc:
+        print("Error extracting metadata:", str(exc))
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
