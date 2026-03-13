@@ -15,12 +15,35 @@ Usage:
     python metadata_extractor.py path/to/document
 """
 
-import sys
 import os
+import sys
 import argparse
 import json
 import stat
 from datetime import datetime
+
+
+def _dependency_import_error(package_name, install_name=None):
+    """Raise a consistent error when an optional dependency is missing."""
+    package_to_install = install_name or package_name
+    raise RuntimeError(
+        f"Missing optional dependency '{package_name}'. Install it with: pip install {package_to_install}"
+    )
+
+
+def _make_json_safe(value):
+    """Convert nested metadata values into JSON-serializable Python primitives."""
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    if isinstance(value, datetime):
+        return value.isoformat()
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    if isinstance(value, dict):
+        return {str(k): _make_json_safe(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_make_json_safe(item) for item in value]
+    return str(value)
 
 def get_filesystem_metadata(file_path):
     """
@@ -48,7 +71,7 @@ def extract_docx_metadata(file_path):
     try:
         from docx import Document
     except ImportError:
-        sys.exit("Error: python-docx is not installed. Install it using: pip install python-docx")
+        _dependency_import_error("python-docx")
     
     doc = Document(file_path)
     core_props = doc.core_properties
@@ -81,7 +104,7 @@ def extract_xlsx_metadata(file_path):
     try:
         from openpyxl import load_workbook
     except ImportError:
-        sys.exit("Error: openpyxl is not installed. Install it using: pip install openpyxl")
+        _dependency_import_error("openpyxl")
     
     wb = load_workbook(file_path, read_only=True)
     props = wb.properties
@@ -109,7 +132,7 @@ def extract_pptx_metadata(file_path):
     try:
         from pptx import Presentation
     except ImportError:
-        sys.exit("Error: python-pptx is not installed. Install it using: pip install python-pptx")
+        _dependency_import_error("python-pptx")
     
     prs = Presentation(file_path)
     core_props = prs.core_properties
@@ -141,7 +164,7 @@ def extract_pdf_metadata(file_path):
     try:
         from PyPDF2 import PdfReader
     except ImportError:
-        sys.exit("Error: PyPDF2 is not installed. Install it using: pip install PyPDF2")
+        _dependency_import_error("PyPDF2")
     
     try:
         reader = PdfReader(file_path)
@@ -169,7 +192,7 @@ def extract_ole_metadata(file_path):
     try:
         import olefile
     except ImportError:
-        sys.exit("Error: olefile is not installed. Install it using: pip install olefile")
+        _dependency_import_error("olefile")
     
     if not olefile.isOleFile(file_path):
         raise ValueError("Not a valid OLE file.")
@@ -200,6 +223,9 @@ def extract_metadata(file_path):
     Determines file type based on extension and extracts metadata accordingly.
     Combines filesystem metadata and document-specific metadata into a detailed structure.
     """
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"File does not exist: {file_path}")
+
     _, ext = os.path.splitext(file_path)
     ext = ext.lower()
 
@@ -223,7 +249,7 @@ def extract_metadata(file_path):
         "document_format": ext,
         "document_metadata": doc_metadata,
     }
-    return combined_metadata
+    return _make_json_safe(combined_metadata)
 
 def main():
     parser = argparse.ArgumentParser(description="Extract comprehensive metadata from Office and PDF documents.")
@@ -231,10 +257,6 @@ def main():
     args = parser.parse_args()
 
     file_path = args.file
-
-    if not os.path.exists(file_path):
-        print("File does not exist:", file_path)
-        sys.exit(1)
 
     try:
         metadata = extract_metadata(file_path)
