@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Result | Comprehensive Metadata Extractor{% endblock %}
+{% block content %}
+<section class="card">
+  <h1>Metadata extracted successfully</h1>
+  <p class="muted">Review grouped data below or inspect raw JSON.</p>
+</section>
+
+<section class="grid">
+  <article class="card">
+    <h2>File system metadata</h2>
+    <dl>
+      {% for key, value in metadata.file_system.items() %}
+      <div class="row"><dt>{{ key.replace('_', ' ') }}</dt><dd>{{ value }}</dd></div>
+      {% endfor %}
+    </dl>
+  </article>
+
+  <article class="card">
+    <h2>Document format</h2>
+    <p><strong>{{ metadata.document_format }}</strong></p>
+  </article>
+</section>
+
+<section class="card">
+  <h2>Document metadata</h2>
+  <dl>
+    {% for key, value in metadata.document_metadata.items() %}
+    <div class="row"><dt>{{ key.replace('_', ' ') }}</dt><dd>{{ value }}</dd></div>
+    {% endfor %}
+  </dl>
+</section>
+
+<section class="card">
+  <div class="json-header">
+    <h2>Raw JSON</h2>
+    <button type="button" id="copyBtn">Copy JSON</button>
+  </div>
+  <pre id="jsonBlock">{{ pretty_json }}</pre>
+</section>
+
+<p><a class="back-link" href="{{ url_for('index') }}">← Upload another file</a></p>
+
+<script>
+  const copyBtn = document.getElementById('copyBtn');
+  const jsonBlock = document.getElementById('jsonBlock');
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(jsonBlock.innerText);
+      copyBtn.innerText = 'Copied!';
+      setTimeout(() => { copyBtn.innerText = 'Copy JSON'; }, 1200);
+    } catch (e) {
+      copyBtn.innerText = 'Copy failed';
+    }
+  });
+</script>
+{% endblock %}

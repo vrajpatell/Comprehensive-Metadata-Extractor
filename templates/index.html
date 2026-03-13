@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Home | Comprehensive Metadata Extractor{% endblock %}
+{% block content %}
+<section class="hero card">
+  <h1>Extract document metadata in seconds.</h1>
+  <p>
+    Upload a file and instantly inspect filesystem details and embedded document properties.
+  </p>
+</section>
+
+<section class="card">
+  <h2>What this tool does</h2>
+  <p>
+    This tool reads metadata only (author, timestamps, revision, file info, etc.).
+    It does <strong>not</strong> extract or display the visible document body content.
+  </p>
+</section>
+
+<section class="card">
+  <h2>Supported file formats</h2>
+  <div class="badges">
+    {% for ext in supported_extensions %}
+    <span class="badge">{{ ext }}</span>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <h2>How it works</h2>
+  <ol>
+    <li>Upload one supported document.</li>
+    <li>The server extracts file-level and format-specific metadata.</li>
+    <li>Review a readable summary and the raw JSON output.</li>
+  </ol>
+</section>
+
+<section class="card">
+  <h2>Upload a file</h2>
+  <p class="muted">Max upload size: 16MB.</p>
+  {% if error %}
+  <div class="error-box">{{ error }}</div>
+  {% endif %}
+  <form action="{{ url_for('extract') }}" method="post" enctype="multipart/form-data" class="upload-form">
+    <label for="file">Choose document</label>
+    <input id="file" name="file" type="file" required />
+    <p class="muted">Accepted: {{ supported_extensions | join(', ') }}</p>
+    <button type="submit">Extract Metadata</button>
+  </form>
+</section>
+{% endblock %}
